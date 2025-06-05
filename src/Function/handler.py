@@ -1,0 +1,58 @@
+import json
+import boto3
+import psycopg2
+import os
+
+cluster_endpoint = os.environ['cluster_endpoint']
+region = os.environ['AWS_REGION']
+
+client = boto3.client("dsql", region_name=region)
+
+def handler(event, context):
+    # The token expiration time is optional, and the default value 900 seconds
+    password_token = client.generate_db_connect_admin_auth_token(cluster_endpoint, region)
+
+    # connection parameters
+    dbname = "dbname=postgres"
+    user = "user=admin"
+    host = f'host={cluster_endpoint}'
+    sslmode = "sslmode=require"
+    sslrootcert = "sslrootcert=system"
+    password = f'password={password_token}'
+
+    # Make a connection to the cluster
+    conn = psycopg2.connect('%s %s %s %s %s' % (dbname, user, host, sslmode, password))
+
+    conn.set_session(autocommit=True)
+
+    cur = conn.cursor()
+    
+    cur.execute("DROP TABLE IF EXISTS users")
+    
+    cur.execute(b"""
+        CREATE TABLE IF NOT EXISTS users(
+            id uuid NOT NULL DEFAULT gen_random_uuid(),
+            name varchar(30) NOT NULL,
+            city varchar(80) NOT NULL,
+            telephone varchar(20) DEFAULT NULL,
+            PRIMARY KEY (id))"""
+        )
+
+    # Insert some rows
+    cur.execute("INSERT INTO users(name, city, telephone) VALUES('John', 'LA', '555-555-0150')")
+
+    # Read back what we have inserted
+    cur.execute("SELECT * FROM users")
+    row = cur.fetchone()
+    print(row)
+
+    # return JSON back to API Gateway
+    return {
+        'statusCode': 200,
+        'body': json.dumps({
+            'id': str(row[0]),
+            'name': row[1],
+            'city': row[2],
+            'telephone': row[3]
+        })
+    }

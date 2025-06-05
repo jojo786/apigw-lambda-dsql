@@ -1,0 +1,84 @@
+Transform: AWS::Serverless-2016-10-31
+Description: 'API Gateway that exposes a path to a Lambda function that connects to
+  PostgreSQL on Aurora DSQL
+
+  '
+Resources:
+  DSQLFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description:
+        Fn::Sub:
+        - Stack ${AWS::StackName} Function ${ResourceName}
+        - ResourceName: DSQLFunction
+      CodeUri: DSQLFunction
+      Handler: handler.handler
+      Runtime: python3.13
+      MemorySize: 128
+      Timeout: 5
+      Tracing: Active
+      Policies:
+      - Statement:
+        - Effect: Allow
+          Action:
+          - dsql:DbConnectAdmin
+          Resource:
+          - Fn::Sub: arn:${AWS::Partition}:dsql:${AWS::Region}:${AWS::AccountId}:cluster/${DSQL}
+      Architectures:
+      - arm64
+      Environment:
+        Variables:
+          REGION:
+            Fn::Sub: ${AWS::Region}
+          cluster_endpoint:
+            Fn::Sub: ${DSQL}.dsql.${AWS::Region}.on.aws
+      LoggingConfig:
+        LogGroup:
+          Fn::Sub: /aws/lambda/${AWS::StackName}
+        LogFormat: JSON
+      Tags:
+        project: apigw-lambda-dsql
+      Events:
+        UsersApiGETusers:
+          Type: Api
+          Properties:
+            Path: /users
+            Method: GET
+            RestApiId:
+              Ref: UsersApi
+    Metadata:
+      SamResourceId: DSQLFunction
+  DSQLFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: /aws/lambda/${DSQLFunction}
+  UsersApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name:
+        Fn::Sub:
+        - ${ResourceName} From Stack ${AWS::StackName}
+        - ResourceName: UsersApi
+      StageName: Prod
+      DefinitionBody:
+        openapi: '3.0'
+        info: {}
+        paths:
+          /users:
+            get:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri:
+                  Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DSQLFunction.Arn}/invocations
+              responses: {}
+      EndpointConfiguration: REGIONAL
+      TracingEnabled: true
+      Cors:
+        MaxAge: 5
+      Tags:
+        project: apigw-lambda-dsql
+  DSQL:
+    Type: AWS::DSQL::Cluster

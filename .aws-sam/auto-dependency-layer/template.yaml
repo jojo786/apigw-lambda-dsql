@@ -1,0 +1,85 @@
+Transform: AWS::Serverless-2016-10-31
+Resources:
+  DSQLFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description:
+        Fn::Sub:
+        - Stack ${AWS::StackName} Function ${ResourceName}
+        - ResourceName: DSQLFunction
+      CodeUri: DSQLFunction
+      Handler: handler.handler
+      Runtime: python3.13
+      MemorySize: 128
+      Timeout: 5
+      Tracing: Active
+      Policies:
+      - Statement:
+        - Effect: Allow
+          Action:
+          - dsql:DbConnectAdmin
+          Resource:
+          - '*'
+      Architectures:
+      - arm64
+      Environment:
+        Variables:
+          cluster_endpoint:
+            Ref: cluster_endpoint
+      LoggingConfig:
+        LogGroup:
+          Fn::Sub: /aws/lambda/${AWS::StackName}
+        LogFormat: JSON
+      Tags:
+        project: apigw-lambda-dsql
+      Events:
+        UsersApiGETusers:
+          Type: Api
+          Properties:
+            Path: /users
+            Method: GET
+            RestApiId:
+              Ref: UsersApi
+      Layers:
+      - Fn::GetAtt:
+        - AwsSamAutoDependencyLayerNestedStack
+        - Outputs.DSQLFunction0771d7ebDepLayer
+    Metadata:
+      SamResourceId: DSQLFunction
+  DSQLFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: /aws/lambda/${DSQLFunction}
+  UsersApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name:
+        Fn::Sub:
+        - ${ResourceName} From Stack ${AWS::StackName}
+        - ResourceName: UsersApi
+      StageName: Prod
+      DefinitionBody:
+        openapi: '3.0'
+        info: {}
+        paths:
+          /users:
+            get:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri:
+                  Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DSQLFunction.Arn}/invocations
+              responses: {}
+      EndpointConfiguration: REGIONAL
+      TracingEnabled: true
+      Cors:
+        MaxAge: 5
+  AwsSamAutoDependencyLayerNestedStack:
+    DeletionPolicy: Delete
+    Metadata:
+      CreatedBy: AWS SAM CLI sync command
+    Properties:
+      TemplateURL: /Users/yusmayet/gitwork/temp/.aws-sam/auto-dependency-layer/adl_nested_template.yaml
+    Type: AWS::CloudFormation::Stack
