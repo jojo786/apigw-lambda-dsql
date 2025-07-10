@@ -9,7 +9,7 @@ region = os.environ['AWS_REGION']
 client = boto3.client("dsql", region_name=region)
 
 def handler(event, context):
-    # The token expiration time is optional, and the default value 900 seconds
+    # Generate a fresh password token for each connection, to ensure the token is not expired when the connection is established
     password_token = client.generate_db_connect_admin_auth_token(cluster_endpoint, region)
 
     # connection parameters

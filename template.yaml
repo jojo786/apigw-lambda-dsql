@@ -23,7 +23,7 @@ Resources:
               Resource:
                 - !Sub arn:${AWS::Partition}:dsql:${AWS::Region}:${AWS::AccountId}:cluster/${DSQL}
       Architectures:
-        - arm64 #Lambda functions will run on Arm-based AWS Graviton processors. The Powertools Lambda layer will also be Arm-based
+        - arm64 #Lambda functions will run on Arm-based AWS Graviton processors. 
       Environment:
         Variables:
           REGION: !Sub ${AWS::Region}
@@ -73,3 +73,8 @@ Resources:
   
   DSQL:
     Type: AWS::DSQL::Cluster
+    Properties:
+      DeletionProtectionEnabled: false
+      Tags:
+        - Key: project
+          Value: "apigw-lambda-dsql"
